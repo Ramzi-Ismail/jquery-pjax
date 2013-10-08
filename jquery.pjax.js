@@ -356,9 +356,6 @@ function pjax(options) {
 
   if (xhr.readyState > 0) {
     if (options.push && !options.replace) {
-      // Cache current container element before replacing it
-      cachePush(pjax.state.id, cloneContents(context))
-
       window.history.pushState(null, "", options.requestUrl)
     }
 
@@ -445,13 +442,6 @@ function onPjaxPopstate(event) {
 
     var container = $(containerSelector)
     if (container.length) {
-      var contents = cacheMapping[state.id]
-
-      if (previousState) {
-        // Cache current container before replacement and inform the
-        // cache which direction the history shifted.
-        cachePop(direction, previousState.id, cloneContents(container))
-      }
 
       var popstateEvent = $.Event('pjax:popstate', {
         state: state,
@@ -469,22 +459,7 @@ function onPjaxPopstate(event) {
         scrollTo: false
       }
 
-      if (contents) {
-        container.trigger('pjax:start', [null, options])
-
-        pjax.state = state
-        if (state.title) document.title = state.title
-        var beforeReplaceEvent = $.Event('pjax:beforeReplace', {
-          state: state,
-          previousState: previousState
-        })
-        container.trigger(beforeReplaceEvent, [contents, options])
-        container.html(contents)
-
-        container.trigger('pjax:end', [null, options])
-      } else {
-        pjax(options)
-      }
+      pjax(options)
 
       // Force reflow/relayout before the browser tries to restore the
       // scroll position.
@@ -786,71 +761,6 @@ function executeScriptTags(scripts) {
   })
 }
 
-// Internal: History DOM caching class.
-var cacheMapping      = {}
-var cacheForwardStack = []
-var cacheBackStack    = []
-
-// Push previous state id and container contents into the history
-// cache. Should be called in conjunction with `pushState` to save the
-// previous container contents.
-//
-// id    - State ID Number
-// value - DOM Element to cache
-//
-// Returns nothing.
-function cachePush(id, value) {
-  cacheMapping[id] = value
-  cacheBackStack.push(id)
-
-  // Remove all entries in forward history stack after pushing a new page.
-  trimCacheStack(cacheForwardStack, 0)
-
-  // Trim back history stack to max cache length.
-  trimCacheStack(cacheBackStack, pjax.defaults.maxCacheLength)
-}
-
-// Shifts cache from directional history cache. Should be
-// called on `popstate` with the previous state id and container
-// contents.
-//
-// direction - "forward" or "back" String
-// id        - State ID Number
-// value     - DOM Element to cache
-//
-// Returns nothing.
-function cachePop(direction, id, value) {
-  var pushStack, popStack
-  cacheMapping[id] = value
-
-  if (direction === 'forward') {
-    pushStack = cacheBackStack
-    popStack  = cacheForwardStack
-  } else {
-    pushStack = cacheForwardStack
-    popStack  = cacheBackStack
-  }
-
-  pushStack.push(id)
-  if (id = popStack.pop())
-    delete cacheMapping[id]
-
-  // Trim whichever stack we just pushed to to max cache length.
-  trimCacheStack(pushStack, pjax.defaults.maxCacheLength)
-}
-
-// Trim a cache stack (either cacheBackStack or cacheForwardStack) to be no
-// longer than the specified length, deleting cached DOM elements as necessary.
-//
-// stack  - Array of state IDs
-// length - Maximum length to trim to
-//
-// Returns nothing.
-function trimCacheStack(stack, length) {
-  while (stack.length > length)
-    delete cacheMapping[stack.shift()]
-}
-
 // Public: Find version identifier for the initial page load.
 //
 // Returns String version or undefined.
@@ -885,7 +795,6 @@ function enable() {
     type: 'GET',
     dataType: 'html',
     scrollTo: 0,
-    maxCacheLength: 20,
     version: findVersion
   }
   $(window).on('popstate.pjax', onPjaxPopstate)
