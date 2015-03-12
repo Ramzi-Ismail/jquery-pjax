@@ -551,7 +551,6 @@ function stripParam(url, name) {
   return url
     .replace(new RegExp('[?&]' + name + '=[^&#]*'), '')
     .replace(/[?&]($|#)/, '\1')
-    .replace(/[?&]/, '?')
 }
 
 function stripInternalParams(url) {
